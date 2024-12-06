@@ -1,0 +1,96 @@
+#include "CTBot.h"        // Currently using version 2.1.14
+#include "ArduinoJson.h"  //MUST USE VERSION 6.19.4
+CTBot myBot;
+
+
+String ssid = "SSID";                                              // REPLACE SSID WITH YOUR WIFI SSID (within brackets)
+String pass = "PASSWORD";                                         // REPLACE Password YOUR WIFI PASSWORD, IF ANY (within brackets)
+String token = "BOT_TOKEN";  // REPLACE Token WITH YOUR TELEGRAM BOT TOKEN (within brackets). Our bot token can be found in our Miro Board
+
+bool previousState = true;
+bool userMessageSent = false;  // tracks if a message has been sent
+
+const int ledPin = 5;
+const int trigPin = 8;
+const int echoPin = 18;
+long duration;
+int distance;
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+  Serial.println("Starting TelegramBot...");
+
+  // setup pin 5 as a digital output pin for LED
+  pinMode(ledPin, OUTPUT);
+  // pin 8 and 18 for the ultrasonic distance sensor
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // connect the ESP8266 to the desired access point
+  myBot.wifiConnect(ssid, pass);
+
+  // set the telegram bot token
+  myBot.setTelegramToken(token);
+
+  // check if all things are ok
+  if (myBot.testConnection())
+    Serial.println("\ntestConnection OK");
+  else
+    Serial.println("\ntestConnection NOK");
+}
+
+void loop() {
+  TBMessage msg;
+
+  if (CTBotMessageText == myBot.getNewMessage(msg)) {
+    if (!userMessageSent) {
+        myBot.sendMessage(msg.sender.id, "Device Enabled");
+        userMessageSent = true;
+    } else {
+        if (previousState) {
+            myBot.sendMessage(msg.sender.id, "Your door is currently open.");
+        } else {
+            myBot.sendMessage(msg.sender.id, "Your door is currently closed.");
+        }
+    }
+}
+
+
+  // Clear the trigPin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // Send a 10-microsecond pulse to trigger the sensor
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Read the duration of the echo signal
+  duration = pulseIn(echoPin, HIGH);
+
+  // Calculate distance (duration / 2 because it travels to the object and back)
+  // We are using the speed of sound in air at room temperature,
+  // which is 0.034 cm per microsecond
+  distance = duration * 0.034 / 2;
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  bool currentState = (distance >= 10);
+
+  // Check for state change
+  if (currentState != previousState) {
+    if (currentState) {
+      myBot.sendMessage(msg.sender.id, "Door has been opened!");
+      digitalWrite(ledPin, HIGH);  // turn on the LED
+    } else {
+      digitalWrite(ledPin, LOW);  // turn off the LED
+    }
+    previousState = currentState;  // Update the previous state
+  }
+
+
+  delay(500);
+}
